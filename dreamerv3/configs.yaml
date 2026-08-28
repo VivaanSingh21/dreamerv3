@@ -79,6 +79,7 @@ defaults:
     prealloc: True
     jit: True
     debug: False
+    profiler: False
     expect_devices: 0
     enable_policy: True
     coordinator_address: ''
@@ -204,7 +205,7 @@ dcs:
   task: dcs_cheetah_run
   script: train_eval
   env.dcs.action_repeat: 4
-  run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, report_every: 1200}
+  run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, report_every: 1200, debug: False}
 
 bsuite:
   task: bsuite_mnist/0
