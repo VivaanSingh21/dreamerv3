@@ -178,7 +178,13 @@ def make_logger(config):
           exp, run, proj, config.logger.user, config.flat))
     elif output == 'wandb':
       name = '/'.join(logdir.split('/')[-4:])
-      outputs.append(elements.logger.WandBOutput(name))
+      # Scalars only. WandBOutput's 4-D (video) branch calls wandb.Video()
+      # without a `format` arg, which newer wandb rejects; and we don't want
+      # episode/report videos in wandb anyway. Reuse the terminal filter — a
+      # proven scalar allowlist (score/length/fps/ratio/losses), which also
+      # keeps epstats/score (the train_eval eval return) and drops
+      # epstats/policy_image + all report/* video keys.
+      outputs.append(elements.logger.WandBOutput(name, config.logger.filter))
     elif output == 'scope':
       outputs.append(elements.logger.ScopeOutput(elements.Path(logdir)))
     else:
