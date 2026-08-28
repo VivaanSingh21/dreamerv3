@@ -121,6 +121,7 @@ def train_eval(
         agent=bind(agent.load, regex=args.from_checkpoint_regex)))
   cp.load_or_save()
   should_save(step)  # Register that we just saved.
+  should_report(step)  # Don't eval before any training has happened.
 
   print('Start training loop')
   train_policy = lambda *args: agent.policy(*args, mode='train')

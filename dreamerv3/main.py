@@ -177,7 +177,9 @@ def make_logger(config):
       outputs.append(elements.logger.ExpaOutput(
           exp, run, proj, config.logger.user, config.flat))
     elif output == 'wandb':
-      name = '/'.join(logdir.split('/')[-4:])
+      parts = logdir.split('/')
+      # The run directory (parent of the {timestamp} dir), e.g. 'dcs_cheetah_run_s0'.
+      name = parts[-2] if len(parts) >= 2 else parts[-1]
       # Scalars only. WandBOutput's 4-D (video) branch calls wandb.Video()
       # without a `format` arg, which newer wandb rejects; and we don't want
       # episode/report videos in wandb anyway. Reuse the terminal filter — a
