@@ -4,6 +4,13 @@ import pathlib
 import sys
 from functools import partial as bind
 
+# Force EGL rendering for MuJoCo/dm_control before any of those modules load.
+# Hard-set (not setdefault) so a container that pre-exports PYOPENGL_PLATFORM=osmesa
+# does not silently push rendering onto the CPU. Needs the container launched with
+# NVIDIA_DRIVER_CAPABILITIES=all,graphics for EGL to find an NVIDIA vendor entry.
+os.environ['MUJOCO_GL'] = 'egl'
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
+
 folder = pathlib.Path(__file__).parent
 sys.path.insert(0, str(folder.parent))
 sys.path.insert(1, str(folder.parent.parent))
@@ -79,8 +86,8 @@ def main(argv=None):
         bind(make_agent, config),
         bind(make_replay, config, 'replay'),
         bind(make_replay, config, 'eval_replay', 'eval'),
-        bind(make_env, config),
-        bind(make_env, config),
+        bind(make_env, config, mode='train'),
+        bind(make_env, config, mode='eval'),
         bind(make_stream, config),
         bind(make_logger, config),
         args)
@@ -97,8 +104,8 @@ def main(argv=None):
         bind(make_agent, config),
         bind(make_replay, config, 'replay'),
         bind(make_replay, config, 'replay_eval', 'eval'),
-        bind(make_env, config),
-        bind(make_env, config),
+        bind(make_env, config, mode='train'),
+        bind(make_env, config, mode='eval'),
         bind(make_stream, config),
         bind(make_logger, config),
         args)
@@ -209,7 +216,7 @@ def make_replay(config, folder, mode='train'):
   return embodied.replay.Replay(**kwargs)
 
 
-def make_env(config, index, **overrides):
+def make_env(config, index, mode='train', **overrides):
   suite, task = config.task.split('_', 1)
   if suite == 'memmaze':
     from embodied.envs import from_gym
@@ -220,6 +227,7 @@ def make_env(config, index, **overrides):
       'dm': 'embodied.envs.from_dmenv:FromDM',
       'crafter': 'embodied.envs.crafter:Crafter',
       'dmc': 'embodied.envs.dmc:DMC',
+      'dcs': 'embodied.envs.dmc_dcs:DMCDCS',
       'atari': 'embodied.envs.atari:Atari',
       'atari100k': 'embodied.envs.atari:Atari',
       'dmlab': 'embodied.envs.dmlab:DMLab',
@@ -238,6 +246,10 @@ def make_env(config, index, **overrides):
     ctor = getattr(module, cls)
   kwargs = config.env.get(suite, {})
   kwargs.update(overrides)
+  if suite == 'dcs' and 'background_videos' not in kwargs:
+    # Train envs draw the DAVIS 'train' video partition, eval envs the held-out
+    # 'val' partition (the distracting-control package picks the first 4 of each).
+    kwargs['background_videos'] = 'val' if mode == 'eval' else 'train'
   if kwargs.pop('use_seed', False):
     kwargs['seed'] = hash((config.seed, index)) % (2 ** 32 - 1)
   if kwargs.pop('use_logdir', False):

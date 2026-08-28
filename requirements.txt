@@ -17,3 +17,12 @@ optax
 portal>=3.5.0
 scope>=0.4.4
 tqdm
+
+# Distracting Control Suite benchmark env (matches the VIBES setup). The
+# background distractor uploads textures via dm_control's legacy
+# mjbindings.mjlib, so dm_control/mujoco are pinned to a version where that
+# path still works. If `from dm_control.mujoco.wrapper import mjbindings` or
+# `mjbindings.mjlib.mjr_uploadTexture` fails at import/run, adjust these pins.
+distracting-control==0.1.1rc3
+dm_control==1.0.15
+mujoco==2.3.7
