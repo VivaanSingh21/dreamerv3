@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 # DreamerV3 DCS campaign — batch 1, run on the viper HOST (not inside the container).
-# Uses nohup + per-run logfiles (viper's tmux.conf fights scripted windows).
-# 4 runs per wave, ONE per GPU (2x size12m on an 11GB card falls back to slow
-# cuDNN kernels — don't pack). 8 runs total across two waves:
+# nohup + per-run logfile (viper's tmux.conf breaks scripted windows).
 #
-#   WAVE=1 bash scripts/launch_dcs_batch1.sh   -> calib + cheetah_run seeds 0,1,2
-#   WAVE=2 bash scripts/launch_dcs_batch1.sh   -> cheetah_run seeds 3,4 + walker_walk seeds 0,1
+# 3 GPUs (1,2,3); GPU 0 left idle — it runs hottest and dm_control's EGL render
+# contexts pile onto physical GPU 0 regardless of CUDA_VISIBLE_DEVICES.
+# XLA CUDA graphs disabled (--xla_gpu_enable_command_buffer=) — the NVRM Xid 13
+# faults that took viper down on 2026-08-28 came from XLA's graph command stream.
 #
-# Run wave 2 once wave 1's GPUs free (or on another box).
-# Runs survive ssh disconnect (nohup). They do NOT survive a host reboot — the
-# container does (docker start dv3), just relaunch.
+#   WAVE=1 bash scripts/launch_dcs_batch1.sh   -> calib + cheetah_run seeds 0,1
+#   WAVE=2 bash scripts/launch_dcs_batch1.sh   -> cheetah_run seeds 2,3,4
+#   WAVE=3 bash scripts/launch_dcs_batch1.sh   -> walker_walk seeds 0,1
+#
+# Stable logdir per run (no {timestamp}): re-run the identical WAVE command after
+# a crash/reboot and it resumes from the last checkpoint (save_every = 15 min).
+# Runs survive ssh disconnect (nohup), NOT a host reboot (relaunch; container
+# survives as Exited -> docker start dv3).
 #
 # monitor:  tail -f ~/dcs_logs/*.log
+#           dmesg -w | grep -i xid        # in a spare terminal — Xid = a seed about to die
 # stop all: docker exec dv3 pkill -9 -f dreamerv3
 
 set -u
@@ -24,6 +30,7 @@ LOGROOT=${LOGROOT:-/workspace/logdir/dcs}
 WANDB_PROJECT=${WANDB_PROJECT:-dreamerv3-dcs}
 OUTPUTS=${OUTPUTS:-jsonl,scope,wandb}   # OUTPUTS=jsonl,scope to skip wandb
 HOSTLOGS=${HOSTLOGS:-$HOME/dcs_logs}
+XLA=${XLA:-"--xla_gpu_enable_command_buffer="}
 
 mkdir -p "$HOSTLOGS"
 docker exec "$CONTAINER" test -d "$DAVIS/DAVIS/JPEGImages/480p" \
@@ -33,11 +40,12 @@ case "$OUTPUTS" in *wandb*) docker exec "$CONTAINER" test -f /root/.netrc \
 
 run() {  # run <gpu> <name> <main.py args...>
   local gpu=$1 name=$2; shift 2
-  nohup docker exec -e CUDA_VISIBLE_DEVICES="$gpu" -e WANDB_PROJECT="$WANDB_PROJECT" "$CONTAINER" \
-    python dreamerv3/main.py \
-      --logdir "$LOGROOT/$name/{timestamp}" \
+  nohup docker exec \
+    -e CUDA_VISIBLE_DEVICES="$gpu" -e WANDB_PROJECT="$WANDB_PROJECT" -e XLA_FLAGS="$XLA" \
+    "$CONTAINER" python dreamerv3/main.py \
+      --logdir "$LOGROOT/$name" \
       --logger.outputs "$OUTPUTS" "$@" \
-    > "$HOSTLOGS/$name.log" 2>&1 &
+    >> "$HOSTLOGS/$name.log" 2>&1 &
   echo "$name -> GPU $gpu   (host pid $!, log $HOSTLOGS/$name.log)"
   sleep 2
 }
@@ -45,23 +53,28 @@ run() {  # run <gpu> <name> <main.py args...>
 DCS=(--configs dcs "$SIZE" --env.dcs.davis_path "$DAVIS")
 W2=(--env.dcs.action_repeat 2 --run.train_ratio 100)   # walker: ar=2, train_ratio=50*2
 
-if [ "$WAVE" = 1 ]; then
-  run 0 calib_walker_walk_s0 \
-    --configs dmc_vision "$SIZE" --task dmc_walker_walk \
-    --script train_eval --run.debug False --run.envs 4 --run.eval_envs 4 \
-    --run.eval_eps 10 --run.report_every 600 \
-    --env.dmc.repeat 2 --run.train_ratio 100 --run.steps 500000 --seed 0
-  run 1 dcs_cheetah_run_s0 "${DCS[@]}" --task dcs_cheetah_run --seed 0
-  run 2 dcs_cheetah_run_s1 "${DCS[@]}" --task dcs_cheetah_run --seed 1
-  run 3 dcs_cheetah_run_s2 "${DCS[@]}" --task dcs_cheetah_run --seed 2
-else
-  run 0 dcs_cheetah_run_s3 "${DCS[@]}" --task dcs_cheetah_run --seed 3
-  run 1 dcs_cheetah_run_s4 "${DCS[@]}" --task dcs_cheetah_run --seed 4
-  run 2 dcs_walker_walk_s0 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 0
-  run 3 dcs_walker_walk_s1 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 1
-fi
+case "$WAVE" in
+  1)
+    run 1 calib_walker_walk_s0 \
+      --configs dmc_vision "$SIZE" --task dmc_walker_walk \
+      --script train_eval --run.debug False --run.envs 4 --run.eval_envs 4 \
+      --run.eval_eps 10 --run.report_every 600 \
+      --env.dmc.repeat 2 --run.train_ratio 100 --run.steps 500000 --seed 0
+    run 2 dcs_cheetah_run_s0 "${DCS[@]}" --task dcs_cheetah_run --seed 0
+    run 3 dcs_cheetah_run_s1 "${DCS[@]}" --task dcs_cheetah_run --seed 1
+    ;;
+  2)
+    run 1 dcs_cheetah_run_s2 "${DCS[@]}" --task dcs_cheetah_run --seed 2
+    run 2 dcs_cheetah_run_s3 "${DCS[@]}" --task dcs_cheetah_run --seed 3
+    run 3 dcs_cheetah_run_s4 "${DCS[@]}" --task dcs_cheetah_run --seed 4
+    ;;
+  3)
+    run 1 dcs_walker_walk_s0 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 0
+    run 2 dcs_walker_walk_s1 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 1
+    ;;
+  *) echo "WAVE must be 1, 2, or 3"; exit 1 ;;
+esac
 
 echo
-echo "monitor:  tail -f $HOSTLOGS/*.log"
-echo "gpus:     docker exec $CONTAINER nvidia-smi   (expect 1 python proc/GPU after ~2 min)"
-echo "stop all: docker exec $CONTAINER pkill -9 -f dreamerv3"
+echo "monitor:  tail -f $HOSTLOGS/*.log   |   dmesg -w | grep -i xid"
+echo "gpus:     docker exec $CONTAINER nvidia-smi   (1 python proc each on GPUs 1-3; GPU 0 idle bar EGL)"
