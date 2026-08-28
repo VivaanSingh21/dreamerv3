@@ -60,10 +60,12 @@ def train_eval(
         episode.add(key + '/sum', value, agg='sum')
     if tran['is_last']:
       result = episode.result()
+      # Train episodes -> episode/score (exploratory policy, train env).
+      # Eval  episodes -> eval/score    (deterministic policy, held-out env).
       logger.add({
           'score': result.pop('score'),
           'length': result.pop('length'),
-      }, prefix='episode')
+      }, prefix=('episode' if mode == 'train' else 'eval'))
       rew = result.pop('rewards')
       if len(rew) > 1:
         result['reward_rate'] = (np.abs(rew[1:] - rew[:-1]) >= 0.01).mean()
@@ -133,7 +135,7 @@ def train_eval(
       print('Evaluation')
       driver_eval.reset(agent.init_policy)
       driver_eval(eval_policy, episodes=args.eval_eps)
-      logger.add(eval_epstats.result(), prefix='epstats')
+      logger.add(eval_epstats.result(), prefix='eval_epstats')
       if len(replay_train):
         carry_report, mets = reportfn(carry_report, stream_report)
         logger.add(mets, prefix='report')
