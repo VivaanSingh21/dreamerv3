@@ -1,0 +1,50 @@
+# Lean image for the Distracting Control Suite benchmark (DreamerV3 leg).
+# Only what DCS needs: JAX + dm_control/mujoco + distracting-control + the
+# repo's requirements. No dmlab / minecraft / minerl / atari.
+#
+#   docker build -f Dockerfile.dcs -t dv3-dcs .
+#
+# Run detached with the repo bind-mounted (edits are live, survives host reboot):
+#
+#   docker run -d --name dv3 --gpus all \
+#     -e NVIDIA_DRIVER_CAPABILITIES=all,graphics \
+#     -v "$(pwd)":/workspace -w /workspace \
+#     dv3-dcs tail -f /dev/null
+#
+# The `graphics` capability is what lets EGL find the NVIDIA vendor ICD; without
+# it MuJoCo rendering silently falls back to nothing.
+
+FROM nvidia/cuda:12.4.1-base-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NVIDIA_DRIVER_CAPABILITIES=all,graphics
+ENV MUJOCO_GL=egl
+ENV PYOPENGL_PLATFORM=egl
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_ROOT_USER_ACTION=ignore
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      software-properties-common gnupg ca-certificates \
+  && add-apt-repository -y ppa:deadsnakes/ppa \
+  && apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3.11-venv python3.11-dev \
+      git curl ffmpeg \
+      libglew2.2 libgl1 libglfw3 libosmesa6 \
+      libegl1 libgles2 libglvnd0 libglx0 libopengl0 \
+      libglib2.0-0 \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN python3.11 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+RUN pip install -U pip setuptools wheel
+
+# Repo requirements (includes jax[cuda12]==0.4.33, which bundles its own CUDA 12
+# userspace libs, plus distracting-control / dm_control==1.0.15 / mujoco==2.3.7).
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt
+
+# distracting-control uses the pre-0.26 gym API surface for env registration.
+RUN pip install "gym==0.26.2"
+
+WORKDIR /workspace
