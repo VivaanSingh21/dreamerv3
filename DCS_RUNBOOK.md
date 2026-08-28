@@ -41,6 +41,27 @@ Then pass `--env.dcs.davis_path /workspace/dcs_data` on every launch.
 
 ---
 
+## 1b. wandb
+
+`wandb` is in `requirements.txt`. Auth is via `/root/.netrc` copied from a machine where
+wandb already works (skip `wandb login` — it can reject newer key formats). base64 to
+avoid newline mangling over SSH:
+
+```bash
+# on the source machine (e.g. canebrake), inside its container:
+docker exec <src_container> cat /root/.netrc | base64 | tr -d '\n'
+# on the destination machine:
+echo '<paste>' | base64 -d > /tmp/netrc
+docker cp /tmp/netrc <dst_container>:/root/.netrc
+docker exec <dst_container> python -c "import netrc; print(netrc.netrc('/root/.netrc').authenticators('api.wandb.ai') is not None)"
+```
+
+`/root/.netrc` does **not** survive `docker rm` — recreate it after any container rebuild.
+Launch with `--logger.outputs '[jsonl,scope,wandb]'` and set `WANDB_PROJECT`. Run name =
+last 4 path segments of `--logdir`.
+
+---
+
 ## 2. Container / EGL
 
 The background distractor uploads a texture to the GL context **every physics step**,

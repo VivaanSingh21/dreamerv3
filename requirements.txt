@@ -17,6 +17,7 @@ optax
 portal>=3.5.0
 scope>=0.4.4
 tqdm
+wandb  # optional logger output (--logger.outputs '[jsonl,scope,wandb]')
 
 # Distracting Control Suite benchmark env (matches the VIBES setup). The
 # background distractor uploads textures via dm_control's legacy
