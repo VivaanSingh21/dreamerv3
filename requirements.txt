@@ -27,4 +27,4 @@ tqdm
 distracting-control==0.1.1rc3
 dm_control==1.0.14
 mujoco==2.3.7
-opencv-python-headless  # distracting_control/background.py imports cv2 (undeclared dep)
+opencv-python-headless==4.9.0.80  # distracting_control/background.py imports cv2 (undeclared dep); 4.10+/5.x force numpy>=2
