@@ -52,9 +52,16 @@ def eval_only(make_agent, make_env, make_logger, args):
         result['reward_rate'] = (np.abs(rew[1:] - rew[:-1]) >= 0.01).mean()
       epstats.add(result)
 
+  # Accept either a snapshot folder (has a 'done' marker) or a 'ckpt/'
+  # directory, resolving the latter via its 'latest' pointer file.
+  ckpt = elements.Path(args.from_checkpoint)
+  if not (ckpt / 'done').exists():
+    latest = ckpt / 'latest'
+    assert latest.exists(), f'No checkpoint at {ckpt}'
+    ckpt = ckpt / latest.read_text().strip()
   cp = elements.Checkpoint()
   cp.agent = agent
-  cp.load(args.from_checkpoint, keys=['agent'])
+  cp.load(str(ckpt), keys=['agent'])
 
   policy = lambda *args: agent.policy(*args, mode='eval')
 
