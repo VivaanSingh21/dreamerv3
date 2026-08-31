@@ -5,6 +5,8 @@ import elements
 import embodied
 import numpy as np
 
+from .final_eval import final_eval
+
 
 def train_eval(
     make_agent,
@@ -157,5 +159,19 @@ def train_eval(
 
     if should_save(step):
       cp.save()
+
+  # Final deterministic evaluation on the held-out (val) videos: the reported
+  # benchmark number. See embodied/run/final_eval.py. Runs once after training,
+  # with a fresh driver so the raw episode scores stay out of eval replay.
+  # Set run.final_eval_eps: 0 to skip.
+  if getattr(args, 'final_eval_eps', 0):
+    print(f'Final evaluation: {int(args.final_eval_eps)} episodes on held-out videos')
+    cp.save()
+    fns = [bind(make_env_eval, i) for i in range(args.eval_envs)]
+    driver_final = embodied.Driver(fns, parallel=(not args.debug))
+    final_eval(
+        driver_final, eval_policy, agent.init_policy,
+        logger, logdir, args.final_eval_eps)
+    driver_final.close()
 
   logger.close()

@@ -56,6 +56,7 @@ defaults:
     envs: 16
     eval_envs: 4
     eval_eps: 1
+    final_eval_eps: 0
     report_batches: 1
     from_checkpoint: ''
     episode_timeout: 180
@@ -205,7 +206,7 @@ dcs:
   task: dcs_cheetah_run
   script: train_eval
   env.dcs.action_repeat: 4
-  run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, report_every: 600, debug: False}
+  run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, final_eval_eps: 100, report_every: 600, debug: False}
 
 bsuite:
   task: bsuite_mnist/0

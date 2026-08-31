@@ -5,6 +5,8 @@ import elements
 import embodied
 import numpy as np
 
+from .final_eval import final_eval
+
 
 def eval_only(make_agent, make_env, make_logger, args):
   assert args.from_checkpoint
@@ -50,18 +52,32 @@ def eval_only(make_agent, make_env, make_logger, args):
         result['reward_rate'] = (np.abs(rew[1:] - rew[:-1]) >= 0.01).mean()
       epstats.add(result)
 
+  cp = elements.Checkpoint()
+  cp.agent = agent
+  cp.load(args.from_checkpoint, keys=['agent'])
+
+  policy = lambda *args: agent.policy(*args, mode='eval')
+
+  # Fixed-episode final evaluation (the reported benchmark number), for runs
+  # that finished before this was built into train_eval. Same output as
+  # train_eval's post-training eval: final_eval/* + <logdir>/final_eval.json.
+  n = int(getattr(args, 'final_eval_eps', 0))
+  if n:
+    print(f'Final evaluation: {n} episodes')
+    fns = [bind(make_env, i) for i in range(args.envs)]
+    driver = embodied.Driver(fns, parallel=(not args.debug))
+    final_eval(driver, policy, agent.init_policy, logger, logdir, n)
+    driver.close()
+    logger.close()
+    return
+
   fns = [bind(make_env, i) for i in range(args.envs)]
   driver = embodied.Driver(fns, parallel=(not args.debug))
   driver.on_step(lambda tran, _: step.increment())
   driver.on_step(lambda tran, _: policy_fps.step())
   driver.on_step(logfn)
 
-  cp = elements.Checkpoint()
-  cp.agent = agent
-  cp.load(args.from_checkpoint, keys=['agent'])
-
   print('Start evaluation')
-  policy = lambda *args: agent.policy(*args, mode='eval')
   driver.reset(agent.init_policy)
   while step < args.steps:
     driver(policy, steps=10)
