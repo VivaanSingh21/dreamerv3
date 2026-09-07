@@ -1,6 +1,7 @@
 import importlib
 import os
 import pathlib
+import re
 import sys
 from functools import partial as bind
 
@@ -177,9 +178,13 @@ def make_logger(config):
       outputs.append(elements.logger.ExpaOutput(
           exp, run, proj, config.logger.user, config.flat))
     elif output == 'wandb':
-      parts = logdir.split('/')
-      # The run directory (parent of the {timestamp} dir), e.g. 'dcs_cheetah_run_s0'.
-      name = parts[-2] if len(parts) >= 2 else parts[-1]
+      parts = [p for p in logdir.split('/') if p]
+      # Name the wandb run after the logdir leaf, e.g. 'dcs_cheetah_run_s0'.
+      # If the leaf is a bare {timestamp} (elements.timestamp() -> 20260906T124819)
+      # fall back to its parent, which is the run dir in the timestamped layout.
+      name = parts[-1] if parts else logdir
+      if re.fullmatch(r'\d{8}T\d{6}', name) and len(parts) >= 2:
+        name = parts[-2]
       # Scalars only. WandBOutput's 4-D (video) branch calls wandb.Video()
       # without a `format` arg, which newer wandb rejects; and we don't want
       # episode/report videos in wandb anyway. Reuse the terminal filter — a
