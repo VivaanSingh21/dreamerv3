@@ -10,6 +10,8 @@
 #   WAVE=1 bash scripts/launch_dcs_batch1.sh   -> calib + cheetah_run seeds 0,1
 #   WAVE=2 bash scripts/launch_dcs_batch1.sh   -> cheetah_run seeds 2,3,4
 #   WAVE=3 bash scripts/launch_dcs_batch1.sh   -> walker_walk seeds 0,1
+#   WAVE=4 bash scripts/launch_dcs_batch1.sh   -> cartpole_swingup seeds 2,3,4
+#   WAVE=5 bash scripts/launch_dcs_batch1.sh   -> reacher_easy s4 + cup_catch seeds 0,1
 #
 # Stable logdir per run (no {timestamp}): re-run the identical WAVE command after
 # a crash/reboot and it resumes from the last checkpoint (save_every = 15 min).
@@ -52,6 +54,7 @@ run() {  # run <gpu> <name> <main.py args...>
 
 DCS=(--configs dcs "$SIZE" --env.dcs.davis_path "$DAVIS")
 W2=(--env.dcs.action_repeat 2 --run.train_ratio 100)   # walker: ar=2, train_ratio=50*2
+C8=(--env.dcs.action_repeat 8 --run.train_ratio 400)   # cartpole: ar=8, train_ratio=50*8
 
 case "$WAVE" in
   1)
@@ -72,7 +75,19 @@ case "$WAVE" in
     run 1 dcs_walker_walk_s0 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 0
     run 2 dcs_walker_walk_s1 "${DCS[@]}" --task dcs_walker_walk "${W2[@]}" --seed 1
     ;;
-  *) echo "WAVE must be 1, 2, or 3"; exit 1 ;;
+  4)
+    run 1 dcs_cartpole_swingup_s2 "${DCS[@]}" --task dcs_cartpole_swingup "${C8[@]}" --seed 2
+    run 2 dcs_cartpole_swingup_s3 "${DCS[@]}" --task dcs_cartpole_swingup "${C8[@]}" --seed 3
+    run 3 dcs_cartpole_swingup_s4 "${DCS[@]}" --task dcs_cartpole_swingup "${C8[@]}" --seed 4
+    ;;
+  5)
+    # reacher_easy + cup_catch both use the dcs defaults (action_repeat 4, train_ratio 200).
+    # GPU 0 left free for a co-tenant CARLA run.
+    run 1 dcs_reacher_easy_s4 "${DCS[@]}" --task dcs_reacher_easy --seed 4
+    run 2 dcs_cup_catch_s0    "${DCS[@]}" --task dcs_cup_catch    --seed 0
+    run 3 dcs_cup_catch_s1    "${DCS[@]}" --task dcs_cup_catch    --seed 1
+    ;;
+  *) echo "WAVE must be 1, 2, 3, 4, or 5"; exit 1 ;;
 esac
 
 echo
