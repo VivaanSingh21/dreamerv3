@@ -35,6 +35,7 @@ defaults:
     minecraft: {size: [64, 64], break_speed: 100.0, logs: False, length: 36000}
     dmc: {size: [64, 64], repeat: 1, proprio: True, image: True, camera: -1}
     dcs: {size: [64, 64], action_repeat: 2, camera: 0, difficulty: easy, dynamic: True, distraction_types: [background, camera, color], background_videos: train, davis_path: ''}
+    carla: {size: [64, 256], frame_skip: 4, max_episode_steps: 1000, num_cameras: 5, rl_image_size: 84, fov: 60, changing_weather_speed: 0.1, bridge_addr: '127.0.0.1:2610', connect_timeout: 900.0, spawn_worker: False, worker_python: python, gpu: '0', carla_root: '', egg: ''}
     loconav: {size: [64, 64], repeat: 1, camera: -1}
 
   replay:
@@ -207,6 +208,19 @@ dcs:
   script: train_eval
   env.dcs.action_repeat: 4
   run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, final_eval_eps: 100, report_every: 600, debug: False}
+
+# DBC / VIBES CARLA 0.9.6 highway task. The env runs in a py3.7 worker process
+# (embodied/envs/carla_bridge/worker.py) that DreamerV3 reaches over a socket --
+# see CARLA_RUNBOOK.md. `frame_skip` (not `repeat`) keeps make_logger's multiplier
+# at 1, so run.steps and the x-axis are AGENT steps = environment interactions.
+# One CARLA server only (envs: 1); do the 100-ep final eval with a separate
+# `eval_only` run against a checkpoint (its own worker on another port).
+# Run with:  --configs carla size12m
+carla:
+  task: carla_town04
+  script: train
+  env.carla.frame_skip: 4
+  run: {steps: 500000, train_ratio: 64, envs: 1, eval_envs: 1, eval_eps: 10, final_eval_eps: 100, report_every: 600, log_every: 120, save_every: 900, debug: False}
 
 bsuite:
   task: bsuite_mnist/0
