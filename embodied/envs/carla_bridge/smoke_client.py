@@ -29,6 +29,7 @@ def main():
 
   s = socket.create_connection((host, int(port)), timeout=30)
   s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+  s.settimeout(600)  # reset() can take minutes during CARLA's respawn-retry loop
   send_msg(s, ('config', {}))  # keep the worker's CLI args
   print('connected; waiting for CARLA to boot ...')
   t0 = time.time()

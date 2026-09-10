@@ -145,10 +145,16 @@ class BridgeEnv(object):
     last = None
     for attempt in range(self.args.max_reset_attempts):
       try:
-        if self.server.ensure():
+        # Only run the fragile server-health precheck on a retry: on the happy path
+        # a transient "port didn't accept within 1s" would trigger a needless
+        # 2-minute server restart.
+        if attempt and self.server.ensure():
           time.sleep(self.args.restart_settle_s)
           self._build_env()
+        t0 = time.time()
         obs = self.env.reset()  # (C,H,W) uint8
+        print('[worker] env.reset() ok in %.1fs (attempt %d)'
+              % (time.time() - t0, attempt + 1))
         return self._pack_obs(obs, 0.0, False, {})
       except self._sick as e:
         last = e
@@ -280,6 +286,13 @@ def main():
         send_msg(conn, ('error', 'unknown command %r' % (cmd,)))
   except (ConnectionError, OSError) as e:
     print('[worker] connection lost: %s' % e)
+  except Exception:  # noqa: BLE001
+    tb = traceback.format_exc()
+    print(tb)
+    try:
+      send_msg(conn, ('error', tb))
+    except OSError:
+      pass
   finally:
     try:
       conn.close()

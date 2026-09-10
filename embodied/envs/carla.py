@@ -109,6 +109,9 @@ class Carla(embodied.Env):
       try:
         s = socket.create_connection((self._host, self._port), timeout=10.0)
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        # Generous per-RPC timeout: a reset during CARLA's respawn-retry loop, or a
+        # mid-run server restart (boot ~120s + settle), can legitimately take minutes.
+        s.settimeout(600.0)
         return s
       except OSError as e:  # noqa: PERF203
         last = e
