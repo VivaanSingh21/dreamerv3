@@ -59,6 +59,9 @@ defaults:
     eval_envs: 4
     eval_eps: 1
     final_eval_eps: 0
+    eval_every: 0  # if >0, also force an eval pass every N agent steps (train_eval.py),
+                   # independent of report_every's wall-clock cadence -- for matching a
+                   # fixed-step-interval eval protocol from another codebase.
     report_batches: 1
     from_checkpoint: ''
     episode_timeout: 180
@@ -220,10 +223,19 @@ dcs:
 # -- so run.steps / the logged x-axis are already agent-decision units.
 # VIBES reference targets (8 seeds): eval return >289 by step ~100k, 365-909
 # (mean 768) by step ~490k. train_ratio/envs are unverified starting points --
-# tune once real throughput is measured on canebrake.
+# tune once real throughput is measured on canebrake. VIBES's own eval protocol
+# (confirmed against their training code, excluding their separate best-agent/
+# final-checkpoint variants): eval_reward_deter, averaged over 10 episodes,
+# every 10,000 agent-decision steps (their eval_every=100 episodes * ep_len=100),
+# using the live training agent -- no checkpoint selection. We match the eval
+# episode count (10) and step cadence (eval_every: 10000) for a comparably
+# dense eval curve; we deliberately do NOT match their deterministic-action
+# eval (Vivaan's call, 2026-09-24: keep DreamerV3 eval stochastic here too,
+# consistent with the CARLA/DCS campaigns -- see carla-integration memory).
 swimmer100:
   task: swimmer100_100link
-  run: {steps: 500000, train_ratio: 512}
+  script: train_eval
+  run: {steps: 500000, train_ratio: 512, eval_eps: 10, eval_every: 10000}
 
 # DBC / VIBES CARLA 0.9.6 highway task. The env runs in a py3.7 worker process
 # (embodied/envs/carla_bridge/worker.py) that DreamerV3 reaches over a socket --

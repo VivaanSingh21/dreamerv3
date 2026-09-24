@@ -41,6 +41,12 @@ def train_eval(
   should_log = elements.when.Clock(args.log_every)
   should_report = elements.when.Clock(args.report_every)
   should_save = elements.when.Clock(args.save_every)
+  # Optional step-count-based eval cadence, independent of report_every's
+  # wall-clock timer -- for matching a fixed-step-interval eval protocol from
+  # another codebase (e.g. VIBES's eval_every=100 episodes -> 10,000 steps).
+  # 0 (default) disables this; report_every alone still gates eval as before.
+  eval_every = int(getattr(args, 'eval_every', 0))
+  last_eval_step = 0
 
   @elements.timer.section('logfn')
   def logfn(tran, worker, mode):
@@ -133,7 +139,11 @@ def train_eval(
   driver_train.reset(agent.init_policy)
   while step < args.steps:
 
-    if should_report(step):
+    do_eval = should_report(step)
+    if eval_every and (int(step) - last_eval_step >= eval_every):
+      do_eval = True
+    if do_eval:
+      last_eval_step = int(step)
       print('Evaluation')
       driver_eval.reset(agent.init_policy)
       driver_eval(eval_policy, episodes=args.eval_eps)
