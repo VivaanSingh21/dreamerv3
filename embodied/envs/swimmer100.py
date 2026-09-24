@@ -30,7 +30,7 @@ class DMCWrapper(gym.Env):
     action_spec = self._env.action_spec()
 
     # Flatten dict observation
-    obs_dim = sum(np.prod(v.shape) for v in obs_spec.values())
+    obs_dim = int(sum(np.prod(v.shape) for v in obs_spec.values()))
     self.observation_space = gym.spaces.Box(
         low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
     )
