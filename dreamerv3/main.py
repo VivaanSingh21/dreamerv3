@@ -241,6 +241,7 @@ def make_env(config, index, mode='train', **overrides):
       'crafter': 'embodied.envs.crafter:Crafter',
       'dmc': 'embodied.envs.dmc:DMC',
       'dcs': 'embodied.envs.dmc_dcs:DMCDCS',
+      'swimmer100': 'embodied.envs.swimmer100:Swimmer100',
       'carla': 'embodied.envs.carla:Carla',
       'atari': 'embodied.envs.atari:Atari',
       'atari100k': 'embodied.envs.atari:Atari',

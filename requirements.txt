@@ -29,3 +29,9 @@ distracting-control==0.1.1rc3
 dm_control==1.0.14
 mujoco==2.3.7
 opencv-python-headless==4.9.0.80  # distracting_control/background.py imports cv2 (undeclared dep); 4.10+/5.x force numpy>=2
+
+# swimmer100 (procedurally-generated 100-link DMC swimmer, VIBES/adversarial_dreamer
+# calibration setup). Reuses dm_control/mujoco pins above. gym is the legacy
+# (0.21-0.25-era) 4-tuple step() API the FromGym adapter expects, NOT gymnasium.
+gym==0.23.1  # pin per adversarial_dreamer's setup; 0.21.0 has broken packaging metadata
+lxml  # dm_control.mjcf already depends on this transitively; declared here for clarity

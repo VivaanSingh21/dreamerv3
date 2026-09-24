@@ -35,6 +35,7 @@ defaults:
     minecraft: {size: [64, 64], break_speed: 100.0, logs: False, length: 36000}
     dmc: {size: [64, 64], repeat: 1, proprio: True, image: True, camera: -1}
     dcs: {size: [64, 64], action_repeat: 2, camera: 0, difficulty: easy, dynamic: True, distraction_types: [background, camera, color], background_videos: train, davis_path: ''}
+    swimmer100: {n_links: 100, episode_length: 100, frame_skip: 10}
     carla: {size: [64, 256], frame_skip: 4, max_episode_steps: 1000, num_cameras: 5, rl_image_size: 84, fov: 60, changing_weather_speed: 0.1, bridge_addr: '127.0.0.1:2610', connect_timeout: 900.0, spawn_worker: False, worker_python: python, gpu: '0', carla_root: '', egg: ''}
     loconav: {size: [64, 64], repeat: 1, camera: -1}
 
@@ -208,6 +209,21 @@ dcs:
   script: train_eval
   env.dcs.action_repeat: 4
   run: {steps: 500000, train_ratio: 200, envs: 4, eval_envs: 4, eval_eps: 10, final_eval_eps: 100, report_every: 600, debug: False}
+
+# Procedurally-generated 100-link DMC swimmer with a 4-dim sinusoid torque
+# action space, matched to the VIBES/adversarial_dreamer calibration setup
+# (repo `adversarial_dreamer`, branch `vibes-swimmer-100link-calibration`) for
+# a 3-way DreamerV3 vs VIBES vs VIBES+Recon-Obj comparison. Vector (401-dim)
+# observations, not pixels. `env.swimmer100.frame_skip` (action_repeat=10) and
+# `episode_length` (100 agent decisions) are baked into the gym wrapper chain
+# itself (embodied/envs/swimmer100.py), same pattern as carla's `frame_skip`
+# -- so run.steps / the logged x-axis are already agent-decision units.
+# VIBES reference targets (8 seeds): eval return >289 by step ~100k, 365-909
+# (mean 768) by step ~490k. train_ratio/envs are unverified starting points --
+# tune once real throughput is measured on canebrake.
+swimmer100:
+  task: swimmer100_100link
+  run: {steps: 500000, train_ratio: 512}
 
 # DBC / VIBES CARLA 0.9.6 highway task. The env runs in a py3.7 worker process
 # (embodied/envs/carla_bridge/worker.py) that DreamerV3 reaches over a socket --
